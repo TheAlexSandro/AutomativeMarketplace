@@ -6,6 +6,7 @@ import { ListingsModule } from "./modules/listings/listings.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { SearchModule } from "./modules/search/search.module";
 import { AppController } from "./app.controller";
+import { AppService } from "./app.service";
 
 @Module({
   imports: [
@@ -17,5 +18,6 @@ import { AppController } from "./app.controller";
     SearchModule,
   ],
   controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}
