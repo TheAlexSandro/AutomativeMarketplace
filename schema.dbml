@@ -1,0 +1,102 @@
+Table categories {
+  id          bigint    [pk, increment]
+  parent_id   bigint
+  name        varchar
+  slug        varchar   [unique]
+  depth       smallint  [default: 0]
+  created_at  timestamp
+  updated_at  timestamp
+
+  Note: 'Adjacency list (parent_id) — human-readable tree edits. Paired with category_closure for fast reads.'
+}
+
+Table category_closure {
+  ancestor_id     bigint
+  descendant_id   bigint
+  depth           smallint
+
+  indexes {
+    (ancestor_id, descendant_id) [pk]
+  }
+
+  Note: 'Every (ancestor, descendant) pair, including self (depth=0). Enables O(1) "get all descendants" lookups for arbitrary tree depth.'
+}
+
+Table filter_attributes {
+  id            bigint  [pk, increment]
+  code          varchar [unique, note: 'e.g. fuel_type, seating_capacity']
+  label         varchar
+  type          varchar [note: 'enum | range | boolean']
+  enum_options  jsonb   [note: 'for type=enum, e.g. ["petrol","diesel"]']
+  range_meta    jsonb   [note: 'for type=range, e.g. {"unit":"km","min":0,"max":500000}']
+  created_at    timestamp
+
+  Note: 'Defines each dynamic filter attribute once, independent of category.'
+}
+
+Table category_filter_attributes {
+  category_id     bigint
+  attribute_id    bigint
+  is_required     boolean [default: false]
+  display_order   smallint [default: 0]
+
+  indexes {
+    (category_id, attribute_id) [pk]
+  }
+
+  Note: 'Many-to-many: which attributes apply to which category (fuel_type only under Cars, not Motorcycles).'
+}
+
+Table listings {
+  id              bigint          [pk, increment]
+  seller_id       bigint          [note: 'FK to users table, out of scope for this assessment']
+  category_id     bigint
+  make            varchar
+  model           varchar
+  year            smallint
+  mileage         integer
+  price           decimal(14,2)
+  condition       varchar         [note: 'new | used | certified_pre_owned']
+  transmission    varchar         [note: 'manual | automatic | cvt | other']
+  fuel_type       varchar         [note: 'petrol | diesel | electric | hybrid | other']
+  color           varchar
+  location_city   varchar
+  location_lat    float
+  location_lng    float
+  status          varchar         [default: 'available', note: 'available | pending | sold | removed']
+  description     text
+  images          jsonb           [note: 'array of image URLs']
+  search_vector   tsvector        [note: 'generated column: make+model (A), city (B), description (C)']
+  created_at      timestamp
+  updated_at      timestamp
+  deleted_at      timestamp       [note: 'soft-delete marker']
+
+  Note: 'Core entity. Partial indexes on all hot columns WHERE deleted_at IS NULL.'
+}
+
+Table listing_attribute_values {
+  id              bigint  [pk, increment]
+  listing_id      bigint
+  attribute_id    bigint
+  value_text      text
+  value_numeric   decimal
+  value_boolean   boolean
+
+  indexes {
+    (listing_id, attribute_id) [unique]
+  }
+
+  Note: 'EAV values — one row per (listing, attribute). Column used depends on filter_attributes.type.'
+}
+
+// -----------------------------------------------------------------
+// Relationships
+// -----------------------------------------------------------------
+Ref: categories.parent_id > categories.id
+Ref: category_closure.ancestor_id > categories.id
+Ref: category_closure.descendant_id > categories.id
+Ref: category_filter_attributes.category_id > categories.id
+Ref: category_filter_attributes.attribute_id > filter_attributes.id
+Ref: listings.category_id > categories.id
+Ref: listing_attribute_values.listing_id > listings.id
+Ref: listing_attribute_values.attribute_id > filter_attributes.id
